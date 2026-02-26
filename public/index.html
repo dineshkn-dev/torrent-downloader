@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Torrent Downloader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Orbitron:wght@500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="description" content="Local torrent downloader — WebTorrent runs on your machine, no cloud." />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-brand">
+        <span class="header-icon" aria-hidden="true"></span>
+        <div>
+          <h1>Torrent Downloader</h1>
+          <p class="subtitle">Local · Private · No cloud. Saves to <code>./downloads</code></p>
+        </div>
+      </div>
+    </header>
+
+    <section class="add-torrent glass-panel">
+      <h2 class="section-title"><span class="section-title-icon">+</span> Add torrent</h2>
+      <div class="tabs">
+        <button type="button" class="tab active" data-tab="magnet">Magnet link</button>
+        <button type="button" class="tab" data-tab="file">.torrent file</button>
+      </div>
+      <div class="tab-panel active" id="panel-magnet">
+        <form id="form-magnet" class="form">
+          <textarea id="magnet" name="magnet" placeholder="Paste magnet link here (magnet:?xt=...)" rows="2"></textarea>
+          <div id="preview-loader-magnet" class="preview-loader hidden" aria-live="polite">
+            <span class="preview-loader-spinner"></span>
+            <span class="preview-loader-text">Fetching torrent info…</span>
+          </div>
+          <button type="submit" class="btn btn-primary" id="btn-add-magnet">Add torrent</button>
+        </form>
+      </div>
+      <div class="tab-panel" id="panel-file">
+        <form id="form-file" class="form">
+          <label class="file-label">
+            <input type="file" name="torrent" accept=".torrent" />
+            <span class="file-text">Choose .torrent file</span>
+          </label>
+          <div id="preview-loader-file" class="preview-loader hidden" aria-live="polite">
+            <span class="preview-loader-spinner"></span>
+            <span class="preview-loader-text">Fetching torrent info…</span>
+          </div>
+          <button type="submit" class="btn btn-primary" id="btn-add-file">Add torrent</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="torrents">
+      <h2 class="section-title"><span class="section-title-icon">↓</span> Downloads</h2>
+      <div id="torrent-list" class="torrent-list"></div>
+      <p id="empty-state" class="empty-state">No torrents yet. Add a magnet link or .torrent file above.</p>
+    </section>
+
+    <footer class="footer glass-panel">
+      <p class="engine-note">Powered by <strong>WebTorrent</strong> — runs locally. No third‑party engine; your data stays on your machine.</p>
+    </footer>
+  </div>
+
+  <div id="preview-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="preview-modal-title">
+    <div class="modal-overlay"></div>
+    <div class="modal-content modal-content-preview">
+      <div class="modal-header">
+        <h2 id="preview-modal-title" class="modal-title">Add torrent?</h2>
+        <button type="button" class="modal-close preview-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="preview-summary" class="details-summary"></div>
+        <h3 class="details-files-heading">Files</h3>
+        <div id="preview-files" class="details-files"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost preview-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary preview-add">Add torrent</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="details-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modal-title">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title" class="modal-title">Torrent details</h2>
+        <button type="button" class="modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="details-summary" class="details-summary"></div>
+        <h3 class="details-files-heading">Files</h3>
+        <div id="details-files" class="details-files"></div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
