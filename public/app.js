@@ -425,13 +425,14 @@ function buildDetailGrid(data) {
     </div>`;
 }
 
-function buildFilesTable(files, showProgress = false) {
+function buildFilesTable(files, showProgress = false, selectable = false) {
   if (!files?.length) {
     return '<p style="padding:14px 16px;font-size:12.5px;color:var(--text-3)">No file list — metadata still loading.</p>';
   }
-  const rows = files.map(f => {
+  const rows = files.map((f, i) => {
     const fPct = Number.isFinite(f?.progress) ? clamp(f.progress, 0, 100) : 0;
     return `<tr>
+      ${selectable ? `<td class="file-check-cell"><input type="checkbox" class="file-check" data-idx="${i}" checked /></td>` : ''}
       <td class="file-name-cell">${escapeHtml(f?.name ?? '—')}</td>
       <td style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);white-space:nowrap">${formatSize(f?.length ?? 0)}</td>
       ${showProgress ? `<td>
@@ -442,9 +443,12 @@ function buildFilesTable(files, showProgress = false) {
       </td>` : ''}
     </tr>`;
   }).join('');
+  const checkAllTh = selectable
+    ? `<th class="file-check-cell"><input type="checkbox" id="check-all-files" checked title="Select / deselect all" /></th>`
+    : '';
   return `<table>
     <thead><tr>
-      <th>File</th><th>Size</th>${showProgress ? '<th style="width:110px">Progress</th>' : ''}
+      ${checkAllTh}<th>File</th><th>Size</th>${showProgress ? '<th style="width:110px">Progress</th>' : ''}
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
@@ -452,7 +456,7 @@ function buildFilesTable(files, showProgress = false) {
 
 function openPreviewModal(data, onConfirm) {
   document.getElementById('preview-summary').innerHTML = buildDetailGrid(data);
-  document.getElementById('preview-files').innerHTML   = buildFilesTable(Array.isArray(data?.files) ? data.files : []);
+  document.getElementById('preview-files').innerHTML   = buildFilesTable(Array.isArray(data?.files) ? data.files : [], false, true);
   window.__previewConfirm = onConfirm;
   document.getElementById('preview-modal').classList.add('is-open');
   document.body.style.overflow = 'hidden';
@@ -467,22 +471,17 @@ function closePreviewModal() {
 async function confirmPreview() {
   const fn = window.__previewConfirm;
   if (!fn) return;
+  const checkboxes = [...document.querySelectorAll('#preview-files .file-check')];
+  const selectedFiles = checkboxes.length
+    ? checkboxes.reduce((acc, cb, i) => { if (cb.checked) acc.push(i); return acc; }, [])
+    : null;
   closePreviewModal();
   try {
-    await fn();
+    await fn(selectedFiles);
     showToast('Torrent added — connecting to peers…', 'success');
-    // Close the add panel
-    document.getElementById('add-panel-wrap')?.classList.remove('open');
-    const fab = document.getElementById('fab-add');
-    if (fab) {
-      fab.setAttribute('aria-expanded', 'false');
-      const span = fab.querySelector('span');
-      const iconAdd   = fab.querySelector('.fab-icon-add');
-      const iconClose = fab.querySelector('.fab-icon-close');
-      if (span) span.textContent = 'Add';
-      if (iconAdd)   iconAdd.style.display   = '';
-      if (iconClose) iconClose.style.display = 'none';
-    }
+    // Close the add modal
+    document.getElementById('add-modal')?.classList.remove('is-open');
+    document.body.style.overflow = '';
     poll();
     // Open details for latest torrent
     const list = await fetchTorrents();
@@ -516,19 +515,20 @@ async function fetchPreviewFile(file) {
   return d;
 }
 
-async function addMagnet(magnet) {
+async function addMagnet(magnet, selectedFiles) {
   const res = await fetch(`${API}/torrents`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ magnet: magnet.trim() }),
+    body: JSON.stringify({ magnet: magnet.trim(), selectedFiles: selectedFiles ?? null }),
   });
   const d = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(d.error || 'Failed to add torrent');
 }
 
-async function addFile(file) {
+async function addFile(file, selectedFiles) {
   const form = new FormData();
   form.append('torrent', file);
+  if (selectedFiles) form.append('selectedFiles', JSON.stringify(selectedFiles));
   const res = await fetch(`${API}/torrents/file`, { method: 'POST', body: form });
   const d = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(d.error || 'Failed to add torrent');
@@ -610,6 +610,23 @@ function initModals() {
   previewModal.querySelector('.preview-add').addEventListener('click', () => confirmPreview());
   previewModal.addEventListener('keydown', e => { if (e.key === 'Escape') closePreviewModal(); });
 
+  // File selection checkboxes (delegated — table is rendered dynamically)
+  previewModal.addEventListener('change', e => {
+    if (e.target.id === 'check-all-files') {
+      const checked = e.target.checked;
+      document.querySelectorAll('#preview-files .file-check').forEach(cb => {
+        cb.checked = checked;
+        cb.closest('tr').classList.toggle('deselected', !checked);
+      });
+    } else if (e.target.classList.contains('file-check')) {
+      e.target.closest('tr').classList.toggle('deselected', !e.target.checked);
+      const all = [...document.querySelectorAll('#preview-files .file-check')];
+      const checkAll = document.getElementById('check-all-files');
+      if (checkAll) checkAll.indeterminate = all.some(c => c.checked) && !all.every(c => c.checked);
+      if (checkAll) checkAll.checked = all.every(c => c.checked);
+    }
+  });
+
   const detailsModal = document.getElementById('details-modal');
   detailsModal.querySelector('.modal-scrim').addEventListener('click', closeDetailsModal);
   detailsModal.querySelector('.modal-close').addEventListener('click', closeDetailsModal);
@@ -646,13 +663,13 @@ document.getElementById('form-magnet').addEventListener('submit', async e => {
   try {
     const data = await fetchPreviewMagnet(magnet);
     setPreviewLoading('magnet', false);
-    openPreviewModal(data, async () => { await addMagnet(magnet); ta.value = ''; });
+    openPreviewModal(data, async (sel) => { await addMagnet(magnet, sel); ta.value = ''; });
   } catch (err) {
     setPreviewLoading('magnet', false);
     // Timeout: offer to add anyway
     if (err.message.includes('timeout') || err.message.includes('Timeout')) {
       openPreviewModal({ name: 'Unknown (metadata timeout)', length: 0, files: [] },
-        async () => { await addMagnet(magnet); ta.value = ''; });
+        async (sel) => { await addMagnet(magnet, sel); ta.value = ''; });
     } else {
       showError(err.message || 'Failed to get preview');
     }
@@ -669,8 +686,8 @@ document.getElementById('form-file').addEventListener('submit', async e => {
   try {
     const data = await fetchPreviewFile(file);
     setPreviewLoading('file', false);
-    openPreviewModal(data, async () => {
-      await addFile(file);
+    openPreviewModal(data, async (sel) => {
+      await addFile(file, sel);
       input.value = '';
       document.getElementById('file-drop-title').textContent = 'Drop .torrent file here';
     });
@@ -732,9 +749,108 @@ document.getElementById('btn-trackers-refresh')?.addEventListener('click', async
 });
 
 /* ═══════════════════════════════════════════════════════════════
+   Downloads folder
+════════════════════════════════════════════════════════════════ */
+function setDirDisplay(dir) {
+  const el = document.getElementById('download-dir-display');
+  if (el) el.textContent = dir;
+}
+
+let _browserParent = null;
+
+async function loadBrowserDir(dir) {
+  const list    = document.getElementById('browser-list');
+  const pathEl  = document.getElementById('browser-current-path');
+  const upBtn   = document.getElementById('browser-up');
+  if (!list) return;
+
+  list.innerHTML = '<div class="browser-loading">Loading…</div>';
+
+  try {
+    const res = await fetch(`${API}/fs/browse?dir=${encodeURIComponent(dir)}`);
+    const d   = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Cannot open folder');
+
+    _browserParent = d.parent !== d.dir ? d.parent : null;
+    if (pathEl) pathEl.textContent = d.dir;
+    if (upBtn)  upBtn.disabled = (d.parent === d.dir);
+
+    // Update input to reflect browsed dir
+    const input = document.getElementById('folder-input');
+    if (input) input.value = d.dir;
+
+    if (!d.entries.length) {
+      list.innerHTML = '<div class="browser-empty">No subfolders here</div>';
+      return;
+    }
+
+    const folderIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+    list.innerHTML = d.entries.map(name =>
+      `<div class="browser-entry" data-path="${escapeHtml(d.dir + '/' + name)}">${folderIcon}<span>${escapeHtml(name)}</span></div>`
+    ).join('');
+
+    list.querySelectorAll('.browser-entry').forEach(el => {
+      el.addEventListener('click', () => loadBrowserDir(el.dataset.path));
+    });
+  } catch (err) {
+    list.innerHTML = `<div class="browser-error">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function openFolderModal() {
+  fetch(`${API}/config`).then(r => r.json()).then(cfg => {
+    const dir   = cfg.downloadDir || '';
+    const input = document.getElementById('folder-input');
+    if (input) input.value = dir;
+    setDirDisplay(dir || './downloads');
+    loadBrowserDir(dir);
+  }).catch(() => {});
+  document.getElementById('folder-modal').classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('folder-input')?.select(), 50);
+}
+
+function closeFolderModal() {
+  document.getElementById('folder-modal').classList.remove('is-open');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('btn-change-folder')?.addEventListener('click', openFolderModal);
+document.getElementById('browser-up')?.addEventListener('click', () => { if (_browserParent) loadBrowserDir(_browserParent); });
+document.getElementById('folder-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); loadBrowserDir(e.target.value.trim()); } });
+document.querySelectorAll('.folder-modal-close').forEach(b => b.addEventListener('click', closeFolderModal));
+document.querySelector('.folder-modal-scrim')?.addEventListener('click', closeFolderModal);
+document.getElementById('folder-modal')?.addEventListener('keydown', e => { if (e.key === 'Escape') closeFolderModal(); });
+
+document.getElementById('btn-save-folder')?.addEventListener('click', async () => {
+  const input = document.getElementById('folder-input');
+  const dir = input?.value?.trim();
+  if (!dir) { showError('Enter a folder path'); return; }
+  const btn = document.getElementById('btn-save-folder');
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/config`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ downloadDir: dir }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || 'Failed to update folder');
+    setDirDisplay(d.downloadDir);
+    closeFolderModal();
+    showToast('Downloads folder updated', 'success');
+  } catch (err) {
+    showError(err.message || 'Failed to update folder');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
    Boot
 ════════════════════════════════════════════════════════════════ */
 applyTheme(localStorage.getItem('theme') || 'dark');
 initModals();
+fetch(`${API}/config`).then(r => r.json()).then(cfg => setDirDisplay(cfg.downloadDir || './downloads')).catch(() => {});
 poll();
 setInterval(poll, 2500);

@@ -83,9 +83,18 @@
       <div class="sidebar-footer">
         <div class="engine-row">
           <span class="engine-dot"></span>
-          <span class="engine-label">aria2 · running</span>
+          <span class="engine-label">WebTorrent · running</span>
         </div>
-        <p class="saves-to">Saves to <code>./downloads</code></p>
+        <div class="saves-to-row">
+          <span class="saves-to-label">Saves to</span>
+          <button class="saves-to-path" id="btn-change-folder" title="Change downloads folder">
+            <code id="download-dir-display">./downloads</code>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+        </div>
         <div class="sidebar-actions">
           <button class="sidebar-action-btn" id="btn-trackers-refresh" title="Refresh tracker list">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -122,104 +131,14 @@
             <h2 class="view-title">Downloads</h2>
             <span class="count-pill" id="count-badge" style="display:none">0</span>
           </div>
-          <button class="fab" id="fab-add" aria-expanded="false" title="Add Torrent">
-            <svg class="fab-icon-add" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <button class="fab" id="fab-add" title="Add Torrent">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            <svg class="fab-icon-close" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-            <span>Add</span>
+            Add
           </button>
         </div>
-
-        <!-- Inline add-torrent panel (collapsible) -->
-        <div class="add-panel-wrap" id="add-panel-wrap">
-          <div class="add-panel-inner">
-            <div class="add-panel">
-
-              <!-- Tab switcher -->
-              <div class="tab-bar">
-                <button class="tab-pill active" data-tab="magnet">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                  </svg>
-                  Magnet link
-                </button>
-                <button class="tab-pill" data-tab="file">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                  </svg>
-                  .torrent file
-                </button>
-              </div>
-
-              <!-- Magnet panel -->
-              <div class="tab-panel active" id="panel-magnet">
-                <form id="form-magnet" class="add-form">
-                  <div class="magnet-input-wrap">
-                    <svg class="magnet-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                    </svg>
-                    <textarea id="magnet" name="magnet" placeholder="Paste magnet link here…" rows="3" spellcheck="false" autocomplete="off"></textarea>
-                  </div>
-                  <div id="preview-loader-magnet" class="preview-loader hidden">
-                    <div class="loader-dots"><span></span><span></span><span></span></div>
-                    <span>Fetching metadata…</span>
-                  </div>
-                  <button type="submit" class="btn btn-primary btn-submit" id="btn-add-magnet">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="7 10 12 15 17 10"/>
-                      <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Add Torrent
-                  </button>
-                </form>
-              </div>
-
-              <!-- File panel -->
-              <div class="tab-panel" id="panel-file">
-                <form id="form-file" class="add-form">
-                  <label class="file-drop-zone" id="file-drop-zone">
-                    <input type="file" name="torrent" accept=".torrent" class="file-input" />
-                    <div class="file-drop-content">
-                      <div class="file-drop-icon">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                          <polyline points="14 2 14 8 20 8"/>
-                          <line x1="12" y1="18" x2="12" y2="12"/>
-                          <line x1="9" y1="15" x2="12" y2="12"/>
-                          <line x1="15" y1="15" x2="12" y2="12"/>
-                        </svg>
-                      </div>
-                      <p class="file-drop-title" id="file-drop-title">Drop .torrent file here</p>
-                      <p class="file-drop-sub">or click to browse</p>
-                    </div>
-                  </label>
-                  <div id="preview-loader-file" class="preview-loader hidden">
-                    <div class="loader-dots"><span></span><span></span><span></span></div>
-                    <span>Reading metadata…</span>
-                  </div>
-                  <button type="submit" class="btn btn-primary btn-submit" id="btn-add-file">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="7 10 12 15 17 10"/>
-                      <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Add Torrent
-                  </button>
-                </form>
-              </div>
-
-            </div><!-- /add-panel -->
-          </div><!-- /add-panel-inner -->
-        </div><!-- /add-panel-wrap -->
 
         <!-- Torrent list -->
         <div id="torrent-list" class="torrent-list"></div>
@@ -250,6 +169,159 @@
 
       </div><!-- /main-inner -->
     </main>
+  </div>
+
+  <!-- ═══ Folder modal ═══ -->
+  <div id="folder-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="folder-modal-title">
+    <div class="modal-scrim folder-modal-scrim"></div>
+    <div class="modal-panel" style="max-width:520px">
+      <div class="modal-drag-handle"></div>
+      <div class="modal-header">
+        <h2 class="modal-title" id="folder-modal-title">Downloads Folder</h2>
+        <button type="button" class="modal-close-btn folder-modal-close" aria-label="Close">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Path input -->
+        <div class="folder-input-wrap">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);flex-shrink:0">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          <input type="text" id="folder-input" class="folder-input" placeholder="/Users/you/Downloads/torrents" spellcheck="false" autocomplete="off" />
+        </div>
+
+        <!-- Folder browser -->
+        <div class="folder-browser">
+          <div class="browser-nav">
+            <button class="browser-up-btn" id="browser-up" title="Go up">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="17 11 12 6 7 11"/><line x1="12" y1="18" x2="12" y2="6"/>
+              </svg>
+            </button>
+            <span class="browser-current-path" id="browser-current-path">/</span>
+          </div>
+          <div class="browser-list" id="browser-list">
+            <div class="browser-loading">Loading…</div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost folder-modal-close">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-save-folder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Add torrent modal ═══ -->
+  <div id="add-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="add-modal-title">
+    <div class="modal-scrim add-modal-scrim"></div>
+    <div class="modal-panel">
+      <div class="modal-drag-handle"></div>
+      <div class="modal-header">
+        <h2 class="modal-title" id="add-modal-title">Add Torrent</h2>
+        <button type="button" class="modal-close-btn add-modal-close" aria-label="Close">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="add-panel">
+
+          <!-- Tab switcher -->
+          <div class="tab-bar">
+            <button class="tab-pill active" data-tab="magnet">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
+              Magnet link
+            </button>
+            <button class="tab-pill" data-tab="file">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              .torrent file
+            </button>
+          </div>
+
+          <div class="tab-panels">
+
+          <!-- Magnet panel -->
+          <div class="tab-panel active" id="panel-magnet">
+            <form id="form-magnet" class="add-form">
+              <div class="magnet-input-wrap">
+                <svg class="magnet-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+                <textarea id="magnet" name="magnet" placeholder="Paste magnet link here…" rows="3" spellcheck="false" autocomplete="off"></textarea>
+              </div>
+              <div id="preview-loader-magnet" class="preview-loader hidden">
+                <div class="loader-dots"><span></span><span></span><span></span></div>
+                <span>Fetching metadata…</span>
+              </div>
+              <button type="submit" class="btn btn-primary btn-submit" id="btn-add-magnet">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Add Torrent
+              </button>
+            </form>
+          </div>
+
+          <!-- File panel -->
+          <div class="tab-panel" id="panel-file">
+            <form id="form-file" class="add-form">
+              <label class="file-drop-zone" id="file-drop-zone">
+                <input type="file" name="torrent" accept=".torrent" class="file-input" />
+                <div class="file-drop-content">
+                  <div class="file-drop-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="12" y1="18" x2="12" y2="12"/>
+                      <line x1="9" y1="15" x2="12" y2="12"/>
+                      <line x1="15" y1="15" x2="12" y2="12"/>
+                    </svg>
+                  </div>
+                  <p class="file-drop-title" id="file-drop-title">Drop .torrent file here</p>
+                  <p class="file-drop-sub">or click to browse</p>
+                </div>
+              </label>
+              <div id="preview-loader-file" class="preview-loader hidden">
+                <div class="loader-dots"><span></span><span></span><span></span></div>
+                <span>Reading metadata…</span>
+              </div>
+              <button type="submit" class="btn btn-primary btn-submit" id="btn-add-file">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Add Torrent
+              </button>
+            </form>
+          </div>
+
+          </div><!-- /tab-panels -->
+        </div><!-- /add-panel -->
+      </div><!-- /modal-body -->
+    </div><!-- /modal-panel -->
   </div>
 
   <!-- ═══ Preview modal ═══ -->
@@ -324,34 +396,31 @@
 
   <script src="app.js"></script>
   <script>
-    // Add panel toggle
-    function toggleAddPanel(open) {
-      const wrap = document.getElementById('add-panel-wrap');
-      const fab  = document.getElementById('fab-add');
-      if (!wrap) return;
-      const isOpen = open !== undefined ? open : !wrap.classList.contains('open');
-      wrap.classList.toggle('open', isOpen);
-      if (fab) {
-        fab.setAttribute('aria-expanded', isOpen);
-        const span        = fab.querySelector('span');
-        const iconAdd     = fab.querySelector('.fab-icon-add');
-        const iconClose   = fab.querySelector('.fab-icon-close');
-        if (span) span.textContent = isOpen ? 'Close' : 'Add';
-        if (iconAdd)   iconAdd.style.display   = isOpen ? 'none' : '';
-        if (iconClose) iconClose.style.display = isOpen ? '' : 'none';
-      }
+    function openAddModal() {
+      document.getElementById('add-modal').classList.add('is-open');
+      document.body.style.overflow = 'hidden';
+      document.getElementById('magnet')?.focus();
+    }
+    function closeAddModal() {
+      document.getElementById('add-modal').classList.remove('is-open');
+      document.body.style.overflow = '';
     }
 
-    document.getElementById('fab-add')?.addEventListener('click', () => toggleAddPanel());
-    document.getElementById('empty-add-btn')?.addEventListener('click', () => toggleAddPanel(true));
+    document.getElementById('fab-add')?.addEventListener('click', openAddModal);
+    document.getElementById('empty-add-btn')?.addEventListener('click', openAddModal);
+    document.querySelector('.add-modal-close')?.addEventListener('click', closeAddModal);
+    document.querySelector('.add-modal-scrim')?.addEventListener('click', closeAddModal);
+    document.getElementById('add-modal')?.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeAddModal();
+    });
 
-    // Tab switching
-    document.querySelectorAll('.tab-pill').forEach(pill => {
+    // Tab switching (scoped to add-modal to avoid conflicts with other modals)
+    document.getElementById('add-modal')?.querySelectorAll('.tab-pill').forEach(pill => {
       pill.addEventListener('click', () => {
         const target = pill.dataset.tab;
         if (!target) return;
-        document.querySelectorAll('.tab-pill').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('#add-modal .tab-pill').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('#add-modal .tab-panel').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
         document.getElementById('panel-' + target)?.classList.add('active');
       });
