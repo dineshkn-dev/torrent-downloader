@@ -700,18 +700,6 @@ html[data-theme="light"] .view-header {
   opacity: 0.93;
 }
 .fab:active { transform: scale(0.96) translateY(0); }
-.fab[aria-expanded="true"] {
-  background: var(--surface-3);
-  color: var(--text-2);
-  box-shadow: none;
-  border: 1px solid var(--border-2);
-}
-.fab[aria-expanded="true"]:hover {
-  background: var(--surface-4);
-  color: var(--text);
-  transform: none;
-  box-shadow: none;
-}
 
 .shortcuts-btn {
   display: flex;

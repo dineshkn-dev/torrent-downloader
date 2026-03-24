@@ -273,7 +273,6 @@ const IC = {
   folder: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
   trash:  `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`,
   stopSeed: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><rect x="9" y="9" width="6" height="6"/></svg>`,
-  resumeSeed: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
 };
 
 function cardActionsHtml({ isFailed, isSeeding }) {
@@ -520,10 +519,6 @@ function updateCardInPlace(card, t) {
           openInExplorer(t.infoHash);
         });
         
-        // (Resume seeding is intentionally not offered in this mode)
-        const resumeSeedBtn = actionsContainer.querySelector('.resume-seed-btn');
-        if (resumeSeedBtn) resumeSeedBtn.remove();
-        
         const removeBtn = actionsContainer.querySelector('.remove-btn');
         if (removeBtn) {
           removeBtn.addEventListener('click', e => {
@@ -593,14 +588,6 @@ function renderList(list) {
     badge.textContent = active;
     badge.style.display = active > 0 ? 'flex' : 'none';
   }
-
-  // Sidebar summary stats
-  const statActive = document.getElementById('stat-active');
-  const statDone   = document.getElementById('stat-done');
-  const statTotal  = document.getElementById('stat-total');
-  if (statActive) statActive.textContent = latestTorrentList.filter(t => !t.done && !t.failed).length;
-  if (statDone)   statDone.textContent   = latestTorrentList.filter(t => t.done).length;
-  if (statTotal)  statTotal.textContent  = latestTorrentList.length;
 
   updateSpeeds(latestTorrentList);
   updateBulkToolbar();

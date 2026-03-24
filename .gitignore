@@ -4,3 +4,5 @@ tmp/
 state.json
 .env
 *.log
+test-torrents/source-files/
+test-torrents/test-generated.torrent
