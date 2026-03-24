@@ -60,17 +60,12 @@ const IC = {
   dl:     `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
   ul:     `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 14 12 9 7 14"/><line x1="12" y1="21" x2="12" y2="9"/></svg>`,
   peers:  `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-  pause:  `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`,
-  play:   `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
   retry:  `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`,
   info:   `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
   trash:  `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`,
+  stopSeed: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><rect x="9" y="9" width="6" height="6"/></svg>`,
+  resumeSeed: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
 };
-
-/* ═══════════════════════════════════════════════════════════════
-   State
-════════════════════════════════════════════════════════════════ */
-const pausedSet = new Set();
 
 /* ═══════════════════════════════════════════════════════════════
    Card rendering
@@ -78,16 +73,16 @@ const pausedSet = new Set();
 function getCardState(t) {
   const isDone   = !!t?.done;
   const isFailed = !!t?.failed;
-  const isPaused = !!t?.paused || pausedSet.has(t?.infoHash ?? '');
-  const isActive = !isDone && !isFailed && !isPaused;
+  const isSeeding = t?.seeding !== false; // Default to true if not specified
+  const isActive = !isDone && !isFailed;
 
   let badgeClass = 'downloading';
   let badgeLabel = 'Downloading';
-  if (isDone)   { badgeClass = 'done';   badgeLabel = 'Complete'; }
-  if (isPaused) { badgeClass = 'paused'; badgeLabel = 'Paused'; }
+  if (isDone && isSeeding) { badgeClass = 'done'; badgeLabel = 'Seeding'; }
+  if (isDone && !isSeeding) { badgeClass = 'done'; badgeLabel = 'Complete'; }
   if (isFailed) { badgeClass = 'failed'; badgeLabel = 'Failed'; }
 
-  return { isDone, isFailed, isPaused, isActive, badgeClass, badgeLabel };
+  return { isDone, isFailed, isActive, isSeeding, badgeClass, badgeLabel };
 }
 
 function renderTorrent(t) {
@@ -97,7 +92,7 @@ function renderTorrent(t) {
   const numPeers = Number.isFinite(t?.numPeers)      ? t.numPeers      : 0;
   const length   = Number.isFinite(t?.length)        ? t.length        : 0;
 
-  const { isDone, isFailed, isPaused, badgeClass, badgeLabel } = getCardState(t);
+  const { isDone, isFailed, isSeeding, badgeClass, badgeLabel } = getCardState(t);
 
   const card = document.createElement('div');
   card.className = [
@@ -106,7 +101,6 @@ function renderTorrent(t) {
     isFailed ? 'failed' : '',
   ].filter(Boolean).join(' ');
   card.dataset.infoHash = t?.infoHash ?? '';
-  card.dataset.paused   = isPaused ? 'true' : 'false';
   card.dataset.failed   = isFailed ? 'true' : 'false';
 
   card.innerHTML = `
@@ -139,16 +133,16 @@ function renderTorrent(t) {
       <div class="card-actions-default card-actions">
         ${isFailed
           ? `<button class="action-btn retry-btn">${IC.retry} Retry</button>`
-          : (!isDone
-              ? `<button class="action-btn pause-btn">${isPaused ? IC.play : IC.pause}
-                  <span class="pause-label">${isPaused ? 'Resume' : 'Pause'}</span>
-                </button>`
-              : '')
+          : ''
         }
         ${!isFailed
           ? `<button class="action-btn details-btn">${IC.info} Details</button>`
           : ''
         }
+        <button class="action-btn open-folder-btn">${IC.info} Open folder</button>
+        ${isSeeding && !isFailed
+          ? `<button class="action-btn stop-seed-btn">${IC.stopSeed} Stop seeding</button>`
+          : `<button class="action-btn" disabled>Seeding stopped</button>`}
         <button class="action-btn remove-btn">${IC.trash} Remove</button>
       </div>
 
@@ -159,12 +153,6 @@ function renderTorrent(t) {
       </div>
     </div>
   `;
-
-  // Pause / resume
-  card.querySelector('.pause-btn')?.addEventListener('click', e => {
-    e.stopPropagation();
-    togglePause(t.infoHash);
-  });
 
   // Retry
   card.querySelector('.retry-btn')?.addEventListener('click', e => {
@@ -193,6 +181,24 @@ function renderTorrent(t) {
     removeTorrent(t.infoHash);
   });
 
+  // Stop seeding
+  card.querySelector('.stop-seed-btn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    stopSeeding(t.infoHash);
+  });
+
+  // Resume seeding
+  card.querySelector('.resume-seed-btn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    resumeSeeding(t.infoHash);
+  });
+
+  // Open in Explorer/Finder
+  card.querySelector('.open-folder-btn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    openInExplorer(t.infoHash);
+  });
+
   return card;
 }
 
@@ -203,12 +209,11 @@ function updateCardInPlace(card, t) {
   const ulSpeed  = Number.isFinite(t?.uploadSpeed)   ? t.uploadSpeed   : 0;
   const numPeers = Number.isFinite(t?.numPeers)      ? t.numPeers      : 0;
 
-  const { isDone, isFailed, isPaused, badgeClass, badgeLabel } = getCardState(t);
+  const { isDone, isFailed, isSeeding, badgeClass, badgeLabel } = getCardState(t);
 
   // Card-level classes / attributes
   card.classList.toggle('done',   isDone);
   card.classList.toggle('failed', isFailed);
-  card.dataset.paused = isPaused ? 'true' : 'false';
   card.dataset.failed = isFailed ? 'true' : 'false';
 
   // Name (only if changed)
@@ -240,12 +245,73 @@ function updateCardInPlace(card, t) {
   if (svUl)    svUl.textContent    = formatSpeed(ulSpeed);
   if (svPeers) svPeers.textContent = `${numPeers} peers`;
 
-  // Pause button label / icon
-  const pauseBtn   = card.querySelector('.pause-btn');
-  const pauseLabel = card.querySelector('.pause-label');
-  if (pauseBtn && pauseLabel) {
-    pauseBtn.innerHTML = `${isPaused ? IC.play : IC.pause}<span class="pause-label">${isPaused ? 'Resume' : 'Pause'}</span>`;
+  // Update card actions if status changed
+  if (!card.classList.contains('confirming-remove')) {
+    const actionsContainer = card.querySelector('.card-actions-default');
+    if (actionsContainer) {
+      const currentButtons = actionsContainer.querySelectorAll('.action-btn');
+      const hasRetry = currentButtons.some(btn => btn.classList.contains('retry-btn'));
+      const hasDetails = currentButtons.some(btn => btn.classList.contains('details-btn'));
+      const hasStopSeed = currentButtons.some(btn => btn.classList.contains('stop-seed-btn'));
+      const hasResumeSeed = currentButtons.some(btn => btn.classList.contains('resume-seed-btn'));
+      
+      const shouldHaveRetry = isFailed;
+      const shouldHaveDetails = !isFailed;
+      const shouldHaveStopSeed = isSeeding && !isFailed;
+
+      if (hasRetry !== shouldHaveRetry || hasDetails !== shouldHaveDetails || 
+          hasStopSeed !== shouldHaveStopSeed) {
+        // Regenerate actions HTML
+        actionsContainer.innerHTML = `
+          ${shouldHaveRetry
+            ? `<button class="action-btn retry-btn">${IC.retry} Retry</button>`
+            : ''
+          }
+          ${shouldHaveDetails
+            ? `<button class="action-btn details-btn">${IC.info} Details</button>`
+            : ''
+          }
+          ${shouldHaveStopSeed
+            ? `<button class="action-btn stop-seed-btn">${IC.stopSeed} Stop seeding</button>`
+            : `<button class="action-btn" disabled>Seeding stopped</button>`
+          }
+          <button class="action-btn remove-btn">${IC.trash} Remove</button>
+        `;
+        
+        // Re-attach event listeners
+        const retryBtn = actionsContainer.querySelector('.retry-btn');
+        if (retryBtn) retryBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          retryTorrent(t.infoHash);
+        });
+        
+        const detailsBtn = actionsContainer.querySelector('.details-btn');
+        if (detailsBtn) detailsBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          openDetails(t.infoHash);
+        });
+        
+        const stopSeedBtn = actionsContainer.querySelector('.stop-seed-btn');
+        if (stopSeedBtn) stopSeedBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          stopSeeding(t.infoHash);
+        });
+        
+        // (Resume seeding is intentionally not offered in this mode)
+        const resumeSeedBtn = actionsContainer.querySelector('.resume-seed-btn');
+        if (resumeSeedBtn) resumeSeedBtn.remove();
+        
+        const removeBtn = actionsContainer.querySelector('.remove-btn');
+        if (removeBtn) {
+          removeBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            card.classList.add('confirming-remove');
+          });
+        }
+      }
+    }
   }
+
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -254,12 +320,6 @@ function updateCardInPlace(card, t) {
 function renderList(list) {
   const container  = document.getElementById('torrent-list');
   const emptyState = document.getElementById('empty-state');
-
-  // Sync pause state from server (source of truth)
-  list.forEach(t => {
-    if (t?.paused) pausedSet.add(t.infoHash ?? '');
-    else pausedSet.delete(t?.infoHash ?? '');
-  });
 
   // Map existing cards
   const existing = new Map();
@@ -298,7 +358,7 @@ function renderList(list) {
 
   // Active count badge (main header)
   const badge = document.getElementById('count-badge');
-  const active = list.filter(t => !t.done && !t.failed && !t.paused).length;
+  const active = list.filter(t => !t.done && !t.failed).length;
   if (badge) {
     badge.textContent = active;
     badge.style.display = active > 0 ? 'flex' : 'none';
@@ -321,7 +381,7 @@ function renderList(list) {
 function updateSpeeds(list) {
   let totalDl = 0, totalUl = 0;
   list.forEach(t => {
-    if (t.failed || t.paused || t.done) return;
+    if (t.failed || t.done) return;
     totalDl += Number.isFinite(t.downloadSpeed) ? t.downloadSpeed : 0;
     totalUl += Number.isFinite(t.uploadSpeed)   ? t.uploadSpeed   : 0;
   });
@@ -355,46 +415,11 @@ async function removeTorrent(infoHash) {
     showError(d.error || 'Failed to remove');
     return;
   }
-  pausedSet.delete(infoHash);
   if (detailsOpenFor === infoHash) closeDetailsModal();
   showToast('Torrent removed', 'success');
   poll();
 }
 
-async function togglePause(infoHash) {
-  const wasPaused = pausedSet.has(infoHash);
-  const pause = !wasPaused;
-  try {
-    const res = await fetch(`${API}/torrents/${encodeURIComponent(infoHash)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pause }),
-    });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      showError(d.error || 'Failed to pause/resume');
-      return;
-    }
-    pause ? pausedSet.add(infoHash) : pausedSet.delete(infoHash);
-    // Instant card update
-    const card = document.querySelector(`.torrent-card[data-info-hash="${infoHash}"]`);
-    if (card) {
-      card.dataset.paused = pause ? 'true' : 'false';
-      const badge = card.querySelector('.card-badge');
-      if (badge) {
-        badge.className = `card-badge ${pause ? 'paused' : 'downloading'}`;
-        badge.innerHTML = `<span class="badge-dot"></span>${pause ? 'Paused' : 'Downloading'}`;
-      }
-      const btn = card.querySelector('.pause-btn');
-      if (btn) {
-        btn.innerHTML = `${pause ? IC.play : IC.pause}<span class="pause-label">${pause ? 'Resume' : 'Pause'}</span>`;
-      }
-    }
-    showToast(pause ? 'Paused' : 'Resumed', 'success');
-  } catch (err) {
-    showError(err.message || 'Failed to pause/resume');
-  }
-}
 
 async function retryTorrent(infoHash) {
   try {
@@ -405,6 +430,41 @@ async function retryTorrent(infoHash) {
     poll();
   } catch (err) {
     showError(err.message || 'Failed to retry torrent');
+  }
+}
+
+async function stopSeeding(infoHash) {
+  try {
+    const res = await fetch(`${API}/torrents/${encodeURIComponent(infoHash)}/stop-seeding`, { method: 'POST' });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || 'Failed to stop seeding');
+    showToast('Seeding stopped', 'success');
+    poll();
+  } catch (err) {
+    showError(err.message || 'Failed to stop seeding');
+  }
+}
+
+async function resumeSeeding(infoHash) {
+  try {
+    const res = await fetch(`${API}/torrents/${encodeURIComponent(infoHash)}/resume-seeding`, { method: 'POST' });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || 'Failed to resume seeding');
+    showToast('Seeding resumed', 'success');
+    poll();
+  } catch (err) {
+    showError(err.message || 'Failed to resume seeding');
+  }
+}
+
+async function openInExplorer(infoHash) {
+  try {
+    const res = await fetch(`${API}/torrents/${encodeURIComponent(infoHash)}/open`, { method: 'POST' });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || 'Failed to open folder');
+    showToast('Opened in file explorer', 'success');
+  } catch (err) {
+    showError(err.message || 'Failed to open folder');
   }
 }
 
@@ -843,6 +903,60 @@ document.getElementById('btn-save-folder')?.addEventListener('click', async () =
     showError(err.message || 'Failed to update folder');
   } finally {
     btn.disabled = false;
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   Test Torrents
+════════════════════════════════════════════════════════════════ */
+document.getElementById('btn-test-torrents')?.addEventListener('click', async function () {
+  if (this.disabled) return;
+  this.disabled = true;
+  const originalText = this.innerHTML;
+  this.innerHTML = '<div class="loader-dots" style="margin-right:6px"><span></span><span></span><span></span></div>Adding…';
+
+  try {
+    const listRes = await fetch(`${API}/test-torrents`);
+    if (!listRes.ok) throw new Error(`Failed to get test torrents list: ${listRes.status}`);
+    const listData = await listRes.json();
+    const files = Array.isArray(listData.files) ? listData.files : [];
+    if (!files.length) throw new Error('No test torrents found');
+
+    let added = 0;
+    const errors = [];
+
+    for (const fileInfo of files) {
+      try {
+        const response = await fetch(fileInfo.url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+        const blob = await response.blob();
+        const file = new File([blob], fileInfo.name, { type: 'application/x-bittorrent' });
+
+        const previewData = await fetchPreviewFile(file);
+
+        await addFile(file, previewData.files.map(f => f.path));
+        added++;
+      } catch (err) {
+        errors.push(`${fileInfo.name}: ${err.message}`);
+      }
+    }
+
+    if (added > 0) {
+      showToast(`Added ${added} test torrent${added === 1 ? '' : 's'}`, 'success');
+    }
+    if (errors.length > 0) {
+      if (added === 0) {
+        showError('Failed to add any test torrents');
+      } else {
+        showError(`${errors.length} test torrent${errors.length === 1 ? '' : 's'} failed`);
+      }
+    }
+  } catch (err) {
+    showError(err.message || 'Failed to add test torrents');
+  } finally {
+    this.disabled = false;
+    this.innerHTML = originalText;
   }
 });
 

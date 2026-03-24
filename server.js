@@ -1,10 +1,12 @@
-import express    from 'express';
-import cors       from 'cors';
-import path       from 'path';
-import fs         from 'fs';
-import os         from 'os';
-import multer     from 'multer';
-import WebTorrent from 'webtorrent';
+import express      from 'express';
+import cors         from 'cors';
+import path         from 'path';
+import fs           from 'fs';
+import os           from 'os';
+import { exec }     from 'child_process';
+import multer       from 'multer';
+import WebTorrent   from 'webtorrent';
+import parseTorrent from 'parse-torrent';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -34,16 +36,33 @@ client.on('error', err => console.error('[webtorrent]', err.message));
 
 /* ─── State persistence ──────────────────────────────────────────────────── */
 function loadState() {
-  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch { return []; }
+  try { 
+    const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    return Array.isArray(state) ? state : [];
+  } catch { 
+    return []; 
+  }
 }
 
 function saveState() {
-  const state = client.torrents.map(t => ({
+  const activeState = client.torrents.map(t => ({
     infoHash:      t.infoHash,
     magnet:        t.magnetURI,
-    paused:        !!t._paused,
     selectedFiles: t._selectedFiles ?? null,
+    seeding:       true, // Active torrents are seeding
+    name:          t.name,
+    length:        t.length,
+    path:          t.path,
+    files:         t.files?.map(f => ({ name: f.name, length: f.length })),
   }));
+  
+  // Load existing state to preserve stopped torrents
+  const existingState = loadState();
+  const stoppedState = existingState.filter(entry => 
+    !client.torrents.some(t => t.infoHash === entry.infoHash) && entry.seeding === false
+  );
+  
+  const state = [...activeState, ...stoppedState];
   try { fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2)); } catch (e) {
     console.error('[state]', e.message);
   }
@@ -57,18 +76,19 @@ function fmt(t) {
   const rawProgress = totalLength > 0 ? (downloaded / totalLength) * 100 : 0;
   const progress    = done ? 100 : Math.min(99.9, rawProgress);
 
+  const seeding = t._seeding ?? true;
   return {
     infoHash:      t.infoHash,
     name:          t.name  || null,
     progress:      Math.round(progress * 10) / 10,
-    downloadSpeed: t.downloadSpeed || 0,
-    uploadSpeed:   t.uploadSpeed   || 0,
-    numPeers:      t.numPeers      || 0,
+    downloadSpeed: seeding ? (t.downloadSpeed || 0) : 0,
+    uploadSpeed:   seeding ? (t.uploadSpeed   || 0) : 0,
+    numPeers:      seeding ? (t.numPeers      || 0) : 0,
     length:        totalLength,
     downloaded,
     done,
-    paused:  !!t._paused,
     failed:  !!t._failed,
+    seeding,
     files: (t.files || []).map(f => ({
       name:     f.name,
       length:   f.length,
@@ -81,6 +101,7 @@ function fmt(t) {
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/test-torrents', express.static(path.join(__dirname, 'test-torrents')));
 
 const upload = multer({ dest: TMP_DIR });
 
@@ -88,20 +109,42 @@ const upload = multer({ dest: TMP_DIR });
 for (const entry of loadState()) {
   if (!entry.magnet) continue;
   try {
-    client.add(entry.magnet, { path: downloadDir }, torrent => {
-      if (entry.paused) { torrent._paused = true; torrent.pause(); }
+    const t = client.add(entry.magnet, { path: downloadDir }, torrent => {
       if (Array.isArray(entry.selectedFiles)) {
         torrent._selectedFiles = entry.selectedFiles;
         torrent.files.forEach((f, i) => { if (!entry.selectedFiles.includes(i)) f.deselect(); });
       }
-      torrent.on('error', err => { torrent._failed = true; torrent._error = err.message; saveState(); });
+      torrent._seeding = entry.seeding ?? true;
+      saveState();
     });
+    t._selectedFiles = entry.selectedFiles;
+    t._seeding = entry.seeding ?? true;
+    t.on('error', err => { t._failed = true; t._error = err.message; saveState(); });
   } catch { /* skip bad entries */ }
 }
 
 /* ─── GET /api/torrents ──────────────────────────────────────────────────── */
 app.get('/api/torrents', (req, res) => {
-  res.json(client.torrents.map(fmt));
+  const activeTorrents = client.torrents.map(fmt);
+  const allState = loadState();
+  const stoppedTorrents = allState
+    .filter(entry => entry.seeding === false)
+    .map(entry => ({
+      infoHash: entry.infoHash,
+      name: entry.name || 'Unknown',
+      progress: 100,
+      downloadSpeed: 0,
+      uploadSpeed: 0,
+      numPeers: 0,
+      length: entry.length || 0,
+      downloaded: entry.length || 0,
+      done: true,
+      failed: false,
+      seeding: false,
+      files: entry.files || [],
+    }));
+  
+  res.json([...activeTorrents, ...stoppedTorrents]);
 });
 
 /* ─── GET /api/torrents/:hash ────────────────────────────────────────────── */
@@ -202,8 +245,39 @@ app.post('/api/torrents', async (req, res) => {
   const magnet = req.body?.magnet?.trim();
   if (!magnet?.startsWith('magnet:')) return res.status(400).json({ error: 'Valid magnet link required' });
 
-  const existing = await client.get(magnet);
+  let existing = await client.get(magnet);
+  let parsedTorrent;
+  try {
+    parsedTorrent = parseTorrent(magnet);
+  } catch (err) {
+    parsedTorrent = null;
+  }
+
+  if (!existing && parsedTorrent?.infoHash) {
+    existing = client.get(parsedTorrent.infoHash);
+  }
+
   if (existing) return res.json(fmt(existing));
+
+  if (parsedTorrent?.infoHash) {
+    const stoppedEntry = loadState().find(e => e.infoHash === parsedTorrent.infoHash && e.seeding === false);
+    if (stoppedEntry) {
+      return res.json({
+        infoHash: stoppedEntry.infoHash,
+        name: stoppedEntry.name || 'Unknown',
+        progress: 100,
+        downloadSpeed: 0,
+        uploadSpeed: 0,
+        numPeers: 0,
+        length: stoppedEntry.length || 0,
+        downloaded: stoppedEntry.length || 0,
+        done: true,
+        failed: false,
+        seeding: false,
+        files: stoppedEntry.files || [],
+      });
+    }
+  }
 
   const selectedFiles = Array.isArray(req.body?.selectedFiles) ? req.body.selectedFiles : null;
   try {
@@ -212,9 +286,11 @@ app.post('/api/torrents', async (req, res) => {
         torrent._selectedFiles = selectedFiles;
         torrent.files.forEach((f, i) => { if (!selectedFiles.includes(i)) f.deselect(); });
       }
+      torrent._seeding = true;
       saveState();
     });
     t._selectedFiles = selectedFiles;
+    t._seeding = true;
     t.on('error', err => { t._failed = true; t._error = err.message; saveState(); });
     saveState();
     res.json(fmt(t));
@@ -229,16 +305,53 @@ app.post('/api/torrents/file', upload.single('torrent'), (req, res) => {
 
   const rawSel = req.body?.selectedFiles;
   const selectedFiles = rawSel ? (() => { try { return JSON.parse(rawSel); } catch { return null; } })() : null;
+
+  let parsed;
+  try {
+    parsed = parseTorrent(fs.readFileSync(req.file.path));
+  } catch (err) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'Invalid torrent file' });
+  }
+
+  if (parsed?.infoHash) {
+    const existing = client.get(parsed.infoHash);
+    if (existing) {
+      fs.unlink(req.file.path, () => {});
+      return res.json(fmt(existing));
+    }
+    const stoppedEntry = loadState().find(e => e.infoHash === parsed.infoHash && e.seeding === false);
+    if (stoppedEntry) {
+      fs.unlink(req.file.path, () => {});
+      return res.json({
+        infoHash: stoppedEntry.infoHash,
+        name: stoppedEntry.name || 'Unknown',
+        progress: 100,
+        downloadSpeed: 0,
+        uploadSpeed: 0,
+        numPeers: 0,
+        length: stoppedEntry.length || 0,
+        downloaded: stoppedEntry.length || 0,
+        done: true,
+        failed: false,
+        seeding: false,
+        files: stoppedEntry.files || [],
+      });
+    }
+  }
+
   try {
     const t = client.add(req.file.path, { path: downloadDir }, torrent => {
       if (Array.isArray(selectedFiles)) {
         torrent._selectedFiles = selectedFiles;
         torrent.files.forEach((f, i) => { if (!selectedFiles.includes(i)) f.deselect(); });
       }
+      torrent._seeding = true;
       saveState();
       fs.unlink(req.file.path, () => {});
     });
     t._selectedFiles = Array.isArray(selectedFiles) ? selectedFiles : null;
+    t._seeding = true;
     t.on('error', err => { t._failed = true; t._error = err.message; saveState(); });
     saveState();
     res.json(fmt(t));
@@ -246,18 +359,6 @@ app.post('/api/torrents/file', upload.single('torrent'), (req, res) => {
     fs.unlink(req.file.path, () => {});
     res.status(500).json({ error: err.message });
   }
-});
-
-/* ─── PATCH /api/torrents/:hash  (pause / resume) ────────────────────────── */
-app.patch('/api/torrents/:hash', async (req, res) => {
-  const t = await client.get(req.params.hash);
-  if (!t) return res.status(404).json({ error: 'Not found' });
-
-  if (req.body?.pause) { t._paused = true;  t.pause(); }
-  else                  { t._paused = false; t.resume(); }
-
-  saveState();
-  res.json({ ok: true });
 });
 
 /* ─── DELETE /api/torrents/:hash ─────────────────────────────────────────── */
@@ -288,6 +389,64 @@ app.post('/api/torrents/:hash/retry', async (req, res) => {
       res.status(500).json({ error: err.message });
     }
   });
+});
+
+/* ─── POST /api/torrents/:hash/stop-seeding ─────────────────────────────── */
+app.post('/api/torrents/:hash/stop-seeding', async (req, res) => {
+  const t = await client.get(req.params.hash);
+  if (!t) return res.status(404).json({ error: 'Not found' });
+
+  // Update state to mark as not seeding and immediately respond
+  const state = loadState();
+  const entry = state.find(e => e.infoHash === req.params.hash);
+  if (entry) {
+    entry.seeding = false;
+    entry.name = t.name;
+    entry.length = t.length;
+    entry.files = t.files?.map(f => ({ name: f.name, length: f.length }));
+    try { fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2)); } catch (e) {
+      console.error('[state]', e.message);
+    }
+  }
+
+  t._seeding = false;
+
+  t.destroy({ destroyStore: false }, err => {
+    if (err) console.error('[torrent destroy]', err.message);
+  });
+
+  res.json({ ok: true });
+});
+
+/* ─── POST /api/torrents/:hash/resume-seeding ───────────────────────────── */
+app.post('/api/torrents/:hash/resume-seeding', async (req, res) => {
+  const state = loadState();
+  const entry = state.find(e => e.infoHash === req.params.hash && e.seeding === false);
+  if (!entry) return res.status(404).json({ error: 'Not found or already seeding' });
+
+  try {
+    const t = client.add(entry.magnet, { path: downloadDir }, torrent => {
+      if (Array.isArray(entry.selectedFiles)) {
+        torrent._selectedFiles = entry.selectedFiles;
+        torrent.files.forEach((f, i) => { if (!entry.selectedFiles.includes(i)) f.deselect(); });
+      }
+      // Update state to mark as seeding
+      const currentState = loadState();
+      const stateEntry = currentState.find(e => e.infoHash === req.params.hash);
+      if (stateEntry) {
+        stateEntry.seeding = true;
+        try { fs.writeFileSync(STATE_FILE, JSON.stringify(currentState, null, 2)); } catch (e) {
+          console.error('[state]', e.message);
+        }
+      }
+    });
+    t._selectedFiles = entry.selectedFiles;
+    t.on('error', err => { t._failed = true; t._error = err.message; saveState(); });
+    saveState();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /* ─── GET /api/fs/browse ─────────────────────────────────────────────────── */
@@ -323,6 +482,75 @@ app.patch('/api/config', (req, res) => {
     res.json({ downloadDir: resolved });
   } catch (err) {
     res.status(400).json({ error: `Cannot use that folder: ${err.message}` });
+  }
+});
+
+function openPathInOS(folder) {
+  if (!folder) throw new Error('No folder to open');
+  const normalized = path.resolve(folder);
+  if (!fs.existsSync(normalized)) throw new Error('Path does not exist');
+
+  let cmd;
+  if (process.platform === 'win32') {
+    cmd = `start "" "${normalized}"`;
+  } else if (process.platform === 'darwin') {
+    cmd = `open "${normalized}"`;
+  } else {
+    cmd = `xdg-open "${normalized}"`;
+  }
+
+  exec(cmd, (err) => {
+    if (err) console.error('[open]', err.message);
+  });
+}
+
+/* ─── POST /api/torrents/:hash/open ────────────────────────────────────── */
+app.post('/api/torrents/:hash/open', async (req, res) => {
+  const infoHash = req.params.hash;
+  const t = await client.get(infoHash);
+
+  let folder = null;
+  if (t) {
+    // Prefer the torrent path if available (folder or file path), otherwise use downloadDir
+    folder = t.path ? t.path : downloadDir;
+  } else {
+    const state = loadState();
+    const entry = state.find(e => e.infoHash === infoHash);
+    if (entry) {
+      // Try to open own folder if we can, else fallback to global download dir
+      folder = entry.path || path.join(downloadDir, entry.name || '');
+      if (!folder || !fs.existsSync(folder)) {
+        folder = downloadDir;
+      }
+    }
+  }
+
+  if (!folder || !fs.existsSync(folder)) {
+    return res.status(404).json({ error: 'Torrent not found or no local folder available' });
+  }
+
+  try {
+    openPathInOS(folder);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Unable to open folder' });
+  }
+});
+
+/* ─── GET /api/test-torrents ────────────────────────────────────────────── */
+app.get('/api/test-torrents', (req, res) => {
+  const testDir = path.join(__dirname, 'test-torrents');
+  try {
+    const files = fs.readdirSync(testDir)
+      .filter(f => /^test-torrent-\d+\.torrent$/i.test(f))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map(f => ({
+        name: f,
+        url: `/test-torrents/${f}`
+      }));
+    res.json({ files });
+  } catch (err) {
+    res.status(500).json({ error: `Cannot read test torrents: ${err.message}` });
   }
 });
 
