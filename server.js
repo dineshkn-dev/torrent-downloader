@@ -554,9 +554,6 @@ app.get('/api/test-torrents', (req, res) => {
   }
 });
 
-/* ─── POST /api/trackers/refresh  (no-op for WebTorrent) ────────────────── */
-app.post('/api/trackers/refresh', (req, res) => res.json({ count: 0 }));
-
 /* ─── 404 for unknown API routes ─────────────────────────────────────────── */
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

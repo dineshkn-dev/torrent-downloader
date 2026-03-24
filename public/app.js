@@ -790,24 +790,6 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   Tracker refresh
-════════════════════════════════════════════════════════════════ */
-document.getElementById('btn-trackers-refresh')?.addEventListener('click', async function () {
-  if (this.disabled) return;
-  this.disabled = true;
-  try {
-    const res = await fetch(`${API}/trackers/refresh`, { method: 'POST' });
-    const d = await res.json().catch(() => ({}));
-    if (res.ok) showToast(`Trackers refreshed (${d.count ?? '?'} loaded)`, 'success');
-    else throw new Error(d.error || 'Failed');
-  } catch (err) {
-    showError(err.message || 'Failed to refresh trackers');
-  } finally {
-    this.disabled = false;
-  }
-});
-
-/* ═══════════════════════════════════════════════════════════════
    Downloads folder
 ════════════════════════════════════════════════════════════════ */
 function setDirDisplay(dir) {
