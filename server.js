@@ -3,10 +3,15 @@ import cors         from 'cors';
 import path         from 'path';
 import fs           from 'fs';
 import os           from 'os';
+import { EventEmitter } from 'events';
 import { exec }     from 'child_process';
 import multer       from 'multer';
 import WebTorrent   from 'webtorrent';
 import parseTorrent from 'parse-torrent';
+
+// WebTorrent can attach many listeners to shared sockets when many torrents are active.
+// Raise the threshold to avoid Node's default (10) false-positive leak warnings.
+EventEmitter.defaultMaxListeners = 50;
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
