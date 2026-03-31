@@ -41,20 +41,17 @@ function updateBulkToolbar() {
   bar.hidden = totalSelected === 0;
 
   const inProgress = selected.filter(t => !t.done && !t.failed).length;
-  const completedNoSeed = selected.filter(t => t.done && t.seeding === false).length;
   const failed = selected.filter(t => t.failed).length;
 
   const btnStop = document.getElementById('bulk-stop-seeding');
-  const btnResume = document.getElementById('bulk-resume-seeding');
   const btnRetry = document.getElementById('bulk-retry-failed');
   const btnRemove = document.getElementById('bulk-remove');
   const btnSelectAll = document.getElementById('bulk-select-all-visible');
 
   if (btnStop) btnStop.disabled = inProgress === 0;
-  if (btnResume) btnResume.disabled = completedNoSeed === 0;
   if (btnRetry) btnRetry.disabled = failed === 0;
   if (btnRemove) btnRemove.disabled = totalSelected === 0;
-  if (btnSelectAll) btnSelectAll.disabled = latestVisibleList.length === 0;
+  if (btnSelectAll) btnSelectAll.disabled = latestTorrentList.length === 0;
 }
 
 function clearSelection() {
@@ -66,7 +63,7 @@ function clearSelection() {
 }
 
 function selectAllVisible() {
-  latestVisibleList.forEach(t => selectedInfoHashes.add(t.infoHash));
+  latestTorrentList.forEach(t => selectedInfoHashes.add(t.infoHash));
   document.querySelectorAll('.torrent-card[data-info-hash]').forEach(card => {
     syncCardSelectionState(card, card.dataset.infoHash || '');
   });
@@ -367,11 +364,6 @@ function renderTorrent(t) {
         ${cardActionsHtml({ isFailed, isSeeding })}
       </div>
 
-      <div class="confirm-remove-row card-actions">
-        <span class="confirm-remove-label">Remove this torrent?</span>
-        <button class="action-btn cancel-remove-btn">Cancel</button>
-        <button class="action-btn confirm-remove-btn">Remove</button>
-      </div>
     </div>
   `;
 
@@ -397,31 +389,27 @@ function renderTorrent(t) {
     openDetails(t.infoHash);
   });
 
-  // Remove flow
+  // Remove
   card.querySelector('.remove-btn').addEventListener('click', e => {
     e.stopPropagation();
-    card.classList.add('confirming-remove');
-  });
-  card.querySelector('.cancel-remove-btn').addEventListener('click', e => {
-    e.stopPropagation();
-    card.classList.remove('confirming-remove');
-  });
-  card.querySelector('.confirm-remove-btn').addEventListener('click', e => {
-    e.stopPropagation();
-    card.classList.remove('confirming-remove');
-    removeTorrent(t.infoHash);
+    showConfirmModal({
+      title: 'Remove torrent?',
+      message: `Remove "${t.name || 'this torrent'}"? This cannot be undone.`,
+      confirmLabel: 'Remove',
+      danger: true,
+      onConfirm: () => removeTorrent(t.infoHash),
+    });
   });
 
   // Stop seeding
   card.querySelector('.stop-seed-btn')?.addEventListener('click', e => {
     e.stopPropagation();
-    stopSeeding(t.infoHash);
-  });
-
-  // Resume seeding
-  card.querySelector('.resume-seed-btn')?.addEventListener('click', e => {
-    e.stopPropagation();
-    resumeSeeding(t.infoHash);
+    showConfirmModal({
+      title: 'Stop seeding?',
+      message: `Stop seeding "${t.name || 'this torrent'}"?`,
+      confirmLabel: 'Stop seeding',
+      onConfirm: () => stopSeeding(t.infoHash),
+    });
   });
 
   // Open in Explorer/Finder
@@ -453,12 +441,10 @@ function updateCardInPlace(card, t) {
   if (nameEl && nameEl.innerHTML !== newName) nameEl.innerHTML = newName;
 
   // Badge
-  if (!card.classList.contains('confirming-remove')) {
-    const badge = card.querySelector('.card-badge');
-    if (badge) {
-      badge.className = `card-badge ${badgeClass}`;
-      badge.innerHTML = `<span class="badge-dot"></span>${badgeLabel}`;
-    }
+  const badge = card.querySelector('.card-badge');
+  if (badge) {
+    badge.className = `card-badge ${badgeClass}`;
+    badge.innerHTML = `<span class="badge-dot"></span>${badgeLabel}`;
   }
 
   // Progress bar
@@ -479,53 +465,62 @@ function updateCardInPlace(card, t) {
   syncCardSelectionState(card, t.infoHash);
 
   // Update card actions if status changed
-  if (!card.classList.contains('confirming-remove')) {
-    const actionsContainer = card.querySelector('.card-actions-default');
-    if (actionsContainer) {
-      const currentButtons = Array.from(actionsContainer.querySelectorAll('.action-btn'));
-      const hasRetry = currentButtons.some(btn => btn.classList.contains('retry-btn'));
-      const hasDetails = currentButtons.some(btn => btn.classList.contains('details-btn'));
-      const hasStopSeed = currentButtons.some(btn => btn.classList.contains('stop-seed-btn'));
+  const actionsContainer = card.querySelector('.card-actions-default');
+  if (actionsContainer) {
+    const currentButtons = Array.from(actionsContainer.querySelectorAll('.action-btn'));
+    const hasRetry = currentButtons.some(btn => btn.classList.contains('retry-btn'));
+    const hasDetails = currentButtons.some(btn => btn.classList.contains('details-btn'));
+    const hasStopSeed = currentButtons.some(btn => btn.classList.contains('stop-seed-btn'));
+    
+    const shouldHaveRetry = isFailed;
+    const shouldHaveDetails = !isFailed;
+    const shouldHaveStopSeed = isSeeding && !isFailed;
+
+    if (hasRetry !== shouldHaveRetry || hasDetails !== shouldHaveDetails || 
+        hasStopSeed !== shouldHaveStopSeed) {
+      actionsContainer.innerHTML = cardActionsHtml({ isFailed, isSeeding });
       
-      const shouldHaveRetry = isFailed;
-      const shouldHaveDetails = !isFailed;
-      const shouldHaveStopSeed = isSeeding && !isFailed;
+      const retryBtn = actionsContainer.querySelector('.retry-btn');
+      if (retryBtn) retryBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        retryTorrent(t.infoHash);
+      });
+      
+      const detailsBtn = actionsContainer.querySelector('.details-btn');
+      if (detailsBtn) detailsBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        openDetails(t.infoHash);
+      });
+      
+      const stopSeedBtn = actionsContainer.querySelector('.stop-seed-btn');
+      if (stopSeedBtn) stopSeedBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        showConfirmModal({
+          title: 'Stop seeding?',
+          message: `Stop seeding "${t.name || 'this torrent'}"?`,
+          confirmLabel: 'Stop seeding',
+          onConfirm: () => stopSeeding(t.infoHash),
+        });
+      });
 
-      if (hasRetry !== shouldHaveRetry || hasDetails !== shouldHaveDetails || 
-          hasStopSeed !== shouldHaveStopSeed) {
-        actionsContainer.innerHTML = cardActionsHtml({ isFailed, isSeeding });
-        
-        const retryBtn = actionsContainer.querySelector('.retry-btn');
-        if (retryBtn) retryBtn.addEventListener('click', e => {
+      const openFolderBtn = actionsContainer.querySelector('.open-folder-btn');
+      if (openFolderBtn) openFolderBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        openInExplorer(t.infoHash);
+      });
+      
+      const removeBtn = actionsContainer.querySelector('.remove-btn');
+      if (removeBtn) {
+        removeBtn.addEventListener('click', e => {
           e.stopPropagation();
-          retryTorrent(t.infoHash);
-        });
-        
-        const detailsBtn = actionsContainer.querySelector('.details-btn');
-        if (detailsBtn) detailsBtn.addEventListener('click', e => {
-          e.stopPropagation();
-          openDetails(t.infoHash);
-        });
-        
-        const stopSeedBtn = actionsContainer.querySelector('.stop-seed-btn');
-        if (stopSeedBtn) stopSeedBtn.addEventListener('click', e => {
-          e.stopPropagation();
-          stopSeeding(t.infoHash);
-        });
-
-        const openFolderBtn = actionsContainer.querySelector('.open-folder-btn');
-        if (openFolderBtn) openFolderBtn.addEventListener('click', e => {
-          e.stopPropagation();
-          openInExplorer(t.infoHash);
-        });
-        
-        const removeBtn = actionsContainer.querySelector('.remove-btn');
-        if (removeBtn) {
-          removeBtn.addEventListener('click', e => {
-            e.stopPropagation();
-            card.classList.add('confirming-remove');
+          showConfirmModal({
+            title: 'Remove torrent?',
+            message: `Remove "${t.name || 'this torrent'}"? This cannot be undone.`,
+            confirmLabel: 'Remove',
+            danger: true,
+            onConfirm: () => removeTorrent(t.infoHash),
           });
-        }
+        });
       }
     }
   }
@@ -664,18 +659,6 @@ async function stopSeeding(infoHash) {
   }
 }
 
-async function resumeSeeding(infoHash) {
-  try {
-    const res = await fetch(`${API}/torrents/${encodeURIComponent(infoHash)}/resume-seeding`, { method: 'POST' });
-    const d = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(d.error || 'Failed to resume seeding');
-    showToast('Seeding resumed', 'success');
-    poll();
-  } catch (err) {
-    showError(err.message || 'Failed to resume seeding');
-  }
-}
-
 async function openInExplorer(infoHash) {
   try {
     const res = await fetch(`${API}/torrents/${encodeURIComponent(infoHash)}/open`, { method: 'POST' });
@@ -714,16 +697,6 @@ function requestStopSeeding(infoHash) {
     });
 }
 
-function requestResumeSeeding(infoHash) {
-  return fetch(`${API}/torrents/${encodeURIComponent(infoHash)}/resume-seeding`, { method: 'POST' })
-    .then(async (res) => {
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || 'Failed to resume seeding');
-      }
-    });
-}
-
 function requestRetry(infoHash) {
   return fetch(`${API}/torrents/${encodeURIComponent(infoHash)}/retry`, { method: 'POST' })
     .then(async (res) => {
@@ -748,14 +721,15 @@ function initBulkActions() {
   document.getElementById('bulk-select-all-visible')?.addEventListener('click', selectAllVisible);
   document.getElementById('bulk-clear-selection')?.addEventListener('click', clearSelection);
 
-  document.getElementById('bulk-stop-seeding')?.addEventListener('click', async () => {
+  document.getElementById('bulk-stop-seeding')?.addEventListener('click', () => {
     const targets = getSelectedTorrents().filter(t => !t.done && !t.failed);
-    await runBulkAction(targets, requestStopSeeding, 'Stopped seeding');
-  });
-
-  document.getElementById('bulk-resume-seeding')?.addEventListener('click', async () => {
-    const targets = getSelectedTorrents().filter(t => t.done && t.seeding === false);
-    await runBulkAction(targets, requestResumeSeeding, 'Resumed seeding');
+    if (!targets.length) return;
+    showConfirmModal({
+      title: 'Stop seeding?',
+      message: `Stop seeding ${targets.length} torrent${targets.length === 1 ? '' : 's'}?`,
+      confirmLabel: 'Stop seeding',
+      onConfirm: async () => { await runBulkAction(targets, requestStopSeeding, 'Stopped seeding'); },
+    });
   });
 
   document.getElementById('bulk-retry-failed')?.addEventListener('click', async () => {
@@ -763,13 +737,42 @@ function initBulkActions() {
     await runBulkAction(targets, requestRetry, 'Retry started');
   });
 
-  document.getElementById('bulk-remove')?.addEventListener('click', async () => {
+  document.getElementById('bulk-remove')?.addEventListener('click', () => {
     const targets = getSelectedTorrents();
-    await runBulkAction(targets, requestRemove, 'Removed');
-    clearSelection();
+    if (!targets.length) return;
+    showConfirmModal({
+      title: 'Remove torrents?',
+      message: `Remove ${targets.length} torrent${targets.length === 1 ? '' : 's'}? This cannot be undone.`,
+      confirmLabel: `Remove ${targets.length === 1 ? 'torrent' : 'all'}`,
+      danger: true,
+      onConfirm: async () => {
+        await runBulkAction(targets, requestRemove, 'Removed');
+        clearSelection();
+      },
+    });
   });
 
   updateBulkToolbar();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Confirm modal
+════════════════════════════════════════════════════════════════ */
+function showConfirmModal({ title, message, confirmLabel = 'Confirm', danger = false, onConfirm }) {
+  document.getElementById('confirm-modal-title').textContent = title;
+  document.getElementById('confirm-modal-message').textContent = message;
+  const okBtn = document.getElementById('confirm-modal-ok');
+  okBtn.textContent = confirmLabel;
+  okBtn.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
+  window.__confirmModalCb = onConfirm;
+  document.getElementById('confirm-modal').classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirm-modal').classList.remove('is-open');
+  document.body.style.overflow = '';
+  window.__confirmModalCb = null;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -995,6 +998,17 @@ function initModals() {
   detailsModal.querySelector('.modal-scrim').addEventListener('click', closeDetailsModal);
   detailsModal.querySelector('.modal-close').addEventListener('click', closeDetailsModal);
   detailsModal.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetailsModal(); });
+
+  const confirmModal = document.getElementById('confirm-modal');
+  confirmModal.querySelector('.confirm-modal-scrim').addEventListener('click', closeConfirmModal);
+  confirmModal.querySelector('.confirm-modal-close').addEventListener('click', closeConfirmModal);
+  document.getElementById('confirm-modal-cancel').addEventListener('click', closeConfirmModal);
+  document.getElementById('confirm-modal-ok').addEventListener('click', () => {
+    const cb = window.__confirmModalCb;
+    closeConfirmModal();
+    if (cb) cb();
+  });
+  confirmModal.addEventListener('keydown', e => { if (e.key === 'Escape') closeConfirmModal(); });
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1326,6 +1340,32 @@ function initKeyboardShortcuts() {
     if (modKey && e.key === 'a') {
       e.preventDefault();
       selectAllVisible();
+      return;
+    }
+
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (focusedCardIndex >= 0 && focusedCardIndex < latestVisibleList.length) {
+        const t = latestVisibleList[focusedCardIndex];
+        if (selectedInfoHashes.has(t.infoHash)) selectedInfoHashes.delete(t.infoHash);
+        else selectedInfoHashes.add(t.infoHash);
+        const card = document.querySelector(`.torrent-card[data-info-hash="${t.infoHash}"]`);
+        if (card) syncCardSelectionState(card, t.infoHash);
+        updateBulkToolbar();
+      }
+      return;
+    }
+
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (focusedCardIndex >= 0 && focusedCardIndex < latestVisibleList.length) {
+        const t = latestVisibleList[focusedCardIndex];
+        if (selectedInfoHashes.has(t.infoHash)) selectedInfoHashes.delete(t.infoHash);
+        else selectedInfoHashes.add(t.infoHash);
+        const card = document.querySelector(`.torrent-card[data-info-hash="${t.infoHash}"]`);
+        if (card) syncCardSelectionState(card, t.infoHash);
+        updateBulkToolbar();
+      }
       return;
     }
 

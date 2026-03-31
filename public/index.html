@@ -162,12 +162,11 @@
         <div class="bulk-toolbar" id="bulk-toolbar" hidden>
           <div class="bulk-left">
             <span class="bulk-title"><strong id="bulk-selected-count">0</strong> selected</span>
-            <button class="bulk-link-btn" id="bulk-select-all-visible" type="button">Select visible</button>
+            <button class="bulk-link-btn" id="bulk-select-all-visible" type="button">Select All</button>
             <button class="bulk-link-btn" id="bulk-clear-selection" type="button">Clear</button>
           </div>
           <div class="bulk-actions">
             <button class="action-btn action-btn-state" id="bulk-stop-seeding" type="button">Stop seeding</button>
-            <button class="action-btn action-btn-priority" id="bulk-resume-seeding" type="button">Resume seeding</button>
             <button class="action-btn action-btn-priority" id="bulk-retry-failed" type="button">Retry failed</button>
             <button class="action-btn action-btn-danger" id="bulk-remove" type="button">Remove selected</button>
           </div>
@@ -452,8 +451,12 @@
         <div class="shortcut-group">
           <div class="shortcut-group-title">Selection</div>
           <div class="shortcut-row">
+            <div class="shortcut-keys"><kbd>Space</kbd></div>
+            <span class="shortcut-desc">Select / deselect focused torrent</span>
+          </div>
+          <div class="shortcut-row">
             <div class="shortcut-keys"><kbd>⌘ A</kbd> <span class="shortcut-sep">/</span> <kbd>Ctrl A</kbd></div>
-            <span class="shortcut-desc">Select all visible torrents</span>
+            <span class="shortcut-desc">Select all torrents</span>
           </div>
           <div class="shortcut-row">
             <div class="shortcut-keys"><kbd>Esc</kbd></div>
@@ -467,6 +470,29 @@
             <span class="shortcut-desc">Open this shortcuts panel</span>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Confirm modal ═══ -->
+  <div id="confirm-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+    <div class="modal-scrim confirm-modal-scrim"></div>
+    <div class="modal-panel" style="max-width:400px">
+      <div class="modal-drag-handle"></div>
+      <div class="modal-header">
+        <h2 class="modal-title" id="confirm-modal-title">Confirm</h2>
+        <button type="button" class="modal-close-btn confirm-modal-close" aria-label="Close">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-modal-message" style="font-size:13.5px;color:var(--text-2);line-height:1.6"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="confirm-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirm-modal-ok">Confirm</button>
       </div>
     </div>
   </div>

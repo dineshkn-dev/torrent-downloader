@@ -1020,21 +1020,6 @@ html[data-theme="light"] .view-header {
   flex-shrink: 0;
 }
 
-.confirm-remove-row {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-}
-.torrent-card.confirming-remove .card-actions-default { display: none; }
-.torrent-card.confirming-remove .confirm-remove-row { display: flex; }
-
-.confirm-remove-label {
-  font-size: 12.5px;
-  color: var(--text-2);
-  flex: 1;
-}
-
 /* ─── Buttons ───────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
@@ -1059,6 +1044,13 @@ html[data-theme="light"] .view-header {
   box-shadow: 0 4px 20px rgba(99,102,241,0.45);
 }
 .btn-primary:active { transform: scale(0.97); }
+
+.btn-danger {
+  background: var(--red);
+  color: #fff;
+}
+.btn-danger:hover { background: #dc2626; transform: translateY(-1px); }
+.btn-danger:active { transform: scale(0.97); }
 
 .btn-ghost {
   background: var(--surface-2);
@@ -1126,18 +1118,6 @@ html[data-theme="light"] .view-header {
   background: rgba(239,68,68,0.18);
   border-color: rgba(239,68,68,0.55);
 }
-
-.action-btn.confirm-remove-btn {
-  background: var(--red);
-  color: #fff;
-  border-color: transparent;
-  width: auto;
-  padding: 0 10px;
-}
-.action-btn.confirm-remove-btn:hover { background: #dc2626; color: #fff; }
-
-.action-btn.cancel-remove-btn { color: var(--text-3); background: transparent; border-color: transparent; width: auto; padding: 0 8px; }
-.action-btn.cancel-remove-btn:hover { color: var(--text-2); background: var(--surface-3); }
 
 .seed-state-chip {
   display: inline-flex;

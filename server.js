@@ -429,37 +429,6 @@ app.post('/api/torrents/:hash/stop-seeding', async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ─── POST /api/torrents/:hash/resume-seeding ───────────────────────────── */
-app.post('/api/torrents/:hash/resume-seeding', async (req, res) => {
-  const state = loadState();
-  const entry = state.find(e => e.infoHash === req.params.hash && e.seeding === false);
-  if (!entry) return res.status(404).json({ error: 'Not found or already seeding' });
-
-  try {
-    const t = client.add(entry.magnet, { path: downloadDir }, torrent => {
-      if (Array.isArray(entry.selectedFiles)) {
-        torrent._selectedFiles = entry.selectedFiles;
-        torrent.files.forEach((f, i) => { if (!entry.selectedFiles.includes(i)) f.deselect(); });
-      }
-      // Update state to mark as seeding
-      const currentState = loadState();
-      const stateEntry = currentState.find(e => e.infoHash === req.params.hash);
-      if (stateEntry) {
-        stateEntry.seeding = true;
-        try { fs.writeFileSync(STATE_FILE, JSON.stringify(currentState, null, 2)); } catch (e) {
-          console.error('[state]', e.message);
-        }
-      }
-    });
-    t._selectedFiles = entry.selectedFiles;
-    t.on('error', err => { t._failed = true; t._error = err.message; saveState(); });
-    saveState();
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 /* ─── GET /api/fs/browse ─────────────────────────────────────────────────── */
 app.get('/api/fs/browse', (req, res) => {
   const requested = req.query.dir || os.homedir();
