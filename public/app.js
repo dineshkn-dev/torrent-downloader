@@ -274,21 +274,17 @@ const IC = {
 
 function cardActionsHtml({ isFailed, isSeeding }) {
   return `
-    <div class="action-cluster action-cluster-main">
+    <div class="card-actions-row">
       ${isFailed
-        ? `<button class="action-btn action-btn-priority retry-btn" title="Retry">${IC.retry}</button>`
-        : `<button class="action-btn action-btn-priority details-btn" title="Details">${IC.info}</button>`
+        ? `<button class="action-btn action-btn-priority retry-btn" data-tooltip="Retry">${IC.retry}</button>`
+        : `<button class="action-btn action-btn-quiet details-btn" data-tooltip="Details">${IC.info}</button>`
       }
-      <button class="action-btn action-btn-quiet open-folder-btn" title="Open folder">${IC.folder}</button>
-    </div>
-    <div class="action-cluster action-cluster-state">
+      <button class="action-btn action-btn-quiet open-folder-btn" data-tooltip="Open folder">${IC.folder}</button>
       ${isSeeding && !isFailed
-        ? `<button class="action-btn action-btn-state stop-seed-btn" title="Stop seeding">${IC.stopSeed}</button>`
+        ? `<button class="action-btn action-btn-state stop-seed-btn" data-tooltip="Stop seeding">${IC.stopSeed}</button>`
         : `<span class="seed-state-chip">Seeding off</span>`
       }
-    </div>
-    <div class="action-cluster action-cluster-danger">
-      <button class="action-btn action-btn-danger remove-btn" title="Remove">${IC.trash}</button>
+      <button class="action-btn action-btn-danger remove-btn" data-tooltip="Remove">${IC.trash}</button>
     </div>
   `;
 }

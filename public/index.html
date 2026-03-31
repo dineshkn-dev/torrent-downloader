@@ -166,9 +166,15 @@
             <button class="bulk-link-btn" id="bulk-clear-selection" type="button">Clear</button>
           </div>
           <div class="bulk-actions">
-            <button class="action-btn action-btn-state" id="bulk-stop-seeding" type="button">Stop seeding</button>
-            <button class="action-btn action-btn-priority" id="bulk-retry-failed" type="button">Retry failed</button>
-            <button class="action-btn action-btn-danger" id="bulk-remove" type="button">Remove selected</button>
+            <button class="action-btn action-btn-state" id="bulk-stop-seeding" type="button" data-tooltip="Stop seeding selected">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><rect x="9" y="9" width="6" height="6"/></svg>
+            </button>
+            <button class="action-btn action-btn-priority" id="bulk-retry-failed" type="button" data-tooltip="Retry failed selected">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+            <button class="action-btn action-btn-danger" id="bulk-remove" type="button" data-tooltip="Remove selected">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            </button>
           </div>
         </div>
 

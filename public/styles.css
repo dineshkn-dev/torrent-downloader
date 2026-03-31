@@ -606,7 +606,7 @@ html[data-theme="light"] .view-header {
 }
 
 .bulk-toolbar {
-  margin: 0 0 12px;
+  margin: 0 0 40px;
   padding: 8px 10px;
   border: 1px solid var(--border-2);
   border-radius: var(--r-sm);
@@ -647,6 +647,15 @@ html[data-theme="light"] .view-header {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.bulk-actions [data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+  transform: translateX(-50%) translateY(-4px);
+}
+.bulk-actions [data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
 }
 
 .bulk-actions .action-btn {
@@ -985,8 +994,6 @@ html[data-theme="light"] .view-header {
 .card-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
   padding: 8px 16px 10px;
   border-top: 1px solid var(--border);
 }
@@ -994,30 +1001,23 @@ html[data-theme="light"] .view-header {
 .card-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
   width: 100%;
-  flex-wrap: wrap;
 }
 
-.action-cluster {
+.card-actions-default {
+  width: 100%;
+}
+
+.card-actions-row {
   display: flex;
   align-items: center;
-  gap: 5px;
-  min-width: 0;
+  gap: 6px;
+  justify-content: flex-end;
+  width: 100%;
 }
 
-.action-cluster-main {
-  flex: 1;
-  flex-wrap: wrap;
-}
-
-.action-cluster-state {
-  flex-shrink: 0;
-}
-
-.action-cluster-danger {
-  flex-shrink: 0;
+.card-actions-row .seed-state-chip {
+  margin-right: auto;
 }
 
 /* ─── Buttons ───────────────────────────────────────────────── */
@@ -1077,6 +1077,7 @@ html[data-theme="light"] .view-header {
   height: 28px;
   white-space: nowrap;
   flex-shrink: 0;
+  position: relative;
 }
 .action-btn:hover { background: var(--surface-3); color: var(--text); border-color: var(--border-2); }
 .action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -1119,6 +1120,35 @@ html[data-theme="light"] .view-header {
   border-color: rgba(239,68,68,0.55);
 }
 
+/* ─── Instant tooltips ────────────────────────────────── */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--surface-4);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border-2);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .1s var(--ease), transform .1s var(--ease);
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .seed-state-chip {
   display: inline-flex;
   align-items: center;
@@ -1134,16 +1164,8 @@ html[data-theme="light"] .view-header {
 }
 
 @media (max-width: 980px) {
-  .card-actions {
-    gap: 6px;
-  }
-
-  .action-cluster-main {
-    flex-basis: 100%;
-  }
-
-  .action-cluster-state {
-    margin-left: 0;
+  .card-actions-row {
+    flex-wrap: wrap;
   }
 }
 
