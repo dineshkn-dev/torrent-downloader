@@ -364,7 +364,18 @@ app.post('/api/torrents/file', upload.single('torrent'), (req, res) => {
 /* ─── DELETE /api/torrents/:hash ─────────────────────────────────────────── */
 app.delete('/api/torrents/:hash', async (req, res) => {
   const t = await client.get(req.params.hash);
-  if (!t) return res.status(404).json({ error: 'Not found' });
+
+  if (!t) {
+    // May be a stopped (non-seeding) torrent persisted only in state
+    const state = loadState();
+    const idx = state.findIndex(e => e.infoHash === req.params.hash);
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    state.splice(idx, 1);
+    try { fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2)); } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+    return res.json({ ok: true });
+  }
 
   t.destroy({ destroyStore: false }, err => {
     if (err) return res.status(500).json({ error: err.message });
